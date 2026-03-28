@@ -1,24 +1,63 @@
-# Python cache
+# Byte-compiled / interpreter
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
 
-# Virtual environment
+# Virtual environments
 .venv/
 venv/
+env/
+.envrc
 
-# Local database
-*.db
-*.sqlite3
+# Packaging / build
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+pip-wheel-metadata/
 
-# Flask/local env
+# Secrets & local env (example ファイルは追跡する)
 .env
+.env.*
+!.env.example
 .flaskenv
 
-# Tooling caches
+# Local databases (SQLite)
+*.db
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Flask instance folder (設定・アップロード等を置く場合)
+instance/
+
+# Tests & linters
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
+.hypothesis/
 
-# OS/editor files
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*~
+*.swo
+
+# OS
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs & temp
+*.log
+*.tmp
+*.temp
