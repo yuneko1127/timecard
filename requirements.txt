@@ -1,0 +1,4 @@
+Flask
+reportlab
+psycopg2-binary
+gunicorn

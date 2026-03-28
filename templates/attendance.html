@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h2>勤怠確認（月次）</h2>
+  <form method="get" class="inline-form attendance-filter-form" id="attendance-filter-form">
+    <div class="month-stepper" role="group" aria-label="対象月の選択">
+      <label class="month-stepper-label">対象月
+        <span class="month-input-with-spin">
+          <input type="month" name="month" value="{{ month }}" />
+          <span class="month-spin-btns">
+            <a
+              class="month-step-btn month-step-up"
+              href="{{ url_for('attendance', month=next_month, company_id=selected_company_id) }}"
+              title="翌月"
+              aria-label="翌月へ"
+            >▲</a>
+            <a
+              class="month-step-btn month-step-down"
+              href="{{ url_for('attendance', month=prev_month, company_id=selected_company_id) }}"
+              title="前月"
+              aria-label="前月へ"
+            >▼</a>
+          </span>
+        </span>
+      </label>
+    </div>
+    <label>会社
+      <select name="company_id">
+        <option value="all" {% if selected_company_id=="all" %}selected{% endif %}>全会社</option>
+        {% for c in companies %}
+        <option value="{{ c.id }}" {% if selected_company_id==c.id|string %}selected{% endif %}>
+          {{ c.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+  <script>
+  (function () {
+    var form = document.getElementById("attendance-filter-form");
+    if (!form) return;
+    form.addEventListener("change", function (e) {
+      var t = e.target;
+      if (t && (t.name === "month" || t.name === "company_id")) {
+        form.submit();
+      }
+    });
+  })();
+  </script>
+
+  <div class="attendance-totals-block">
+    <h3>総実働時間</h3>
+    <div class="table-scroll">
+    <table class="attendance-totals-table">
+      <thead>
+        <tr>
+          <th>会社</th>
+          <th>総実働(分)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for company_name, total in company_totals.items() %}
+        <tr>
+          <td>{{ company_name }}</td>
+          <td>{{ total }}分</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="2">対象期間の実働データはありません。</td>
+        </tr>
+        {% endfor %}
+        {% if selected_company_id == "all" %}
+        <tr>
+          <th>全会社合計</th>
+          <th>{{ grand_total_minutes }}分</th>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="attendance-detail-block">
+    <div class="attendance-detail-toolbar">
+      <div
+        class="attendance-export-actions attendance-export-actions--compact"
+        role="group"
+        aria-label="勤怠データのダウンロード"
+      >
+        <span class="attendance-export-heading">ダウンロード</span>
+        <div class="attendance-export-buttons">
+          <a
+            class="attendance-export-link"
+            href="{{ url_for('attendance_csv', month=month, company_id=selected_company_id) }}"
+            title="表計算・編集向け"
+          >
+            <span class="attendance-export-format">CSV</span>
+            <span class="attendance-export-desc">表計算・編集向け</span>
+          </a>
+          <a
+            class="attendance-export-link"
+            href="{{ url_for('attendance_pdf', month=month, company_id=selected_company_id) }}"
+            title="印刷・閲覧向け"
+          >
+            <span class="attendance-export-format">PDF</span>
+            <span class="attendance-export-desc">印刷・閲覧向け</span>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="table-scroll table-scroll--wide">
+    <table class="attendance-detail-table">
+      <thead>
+        <tr>
+          <th>日付</th>
+          <th>会社</th>
+          <th>出勤</th>
+          <th>退勤</th>
+          <th>休憩入り</th>
+          <th>休憩終り</th>
+          <th>休憩</th>
+          <th>勤務</th>
+          <th>実働</th>
+          <th>警告</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in summary %}
+        <tr>
+          <td>
+            {% if r.date %}
+            <a href="{{ url_for('attendance_day_edit', day_key=r.date, month=month) }}">{{ r.date }}</a>
+            {% endif %}
+          </td>
+          <td>{{ r.company_name }}</td>
+          <td>
+            <pre class="multi-time">{{ r.clock_in }}</pre>
+          </td>
+          <td>
+            <pre class="multi-time">{{ r.clock_out }}</pre>
+          </td>
+          <td>
+            <pre class="multi-time">{{ r.break_start }}</pre>
+          </td>
+          <td>
+            <pre class="multi-time">{{ r.break_end }}</pre>
+          </td>
+          <td>{{ r.break_minutes }}分</td>
+          <td>{{ r.work_minutes }}分</td>
+          <td>{{ r.net_minutes }}分</td>
+          <td class="warn-cell">
+            {% if r.warning %}
+            <span class="warn-flag-wrap" tabindex="0">
+              <span class="warn-flag">警告</span>
+              <span class="warn-tooltip" role="tooltip">{{ r.warning | e }}</span>
+            </span>
+            {% else %}
+            -
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

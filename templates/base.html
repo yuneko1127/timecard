@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>タイムカードアプリ</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="header-top">
+      <h1 class="site-title">タイムカードアプリ</h1>
+      <div class="header-clock" aria-live="polite">
+        <span class="header-clock-label">現在時刻（JST）</span>
+        <time id="jst-clock" class="header-clock-value" datetime="">--</time>
+      </div>
+    </div>
+    {% if session.get("user_id") %}
+    <nav class="header-nav" aria-label="メインメニュー">
+      <a href="{{ url_for('punch') }}">打刻</a>
+      <a href="{{ url_for('attendance') }}">勤怠確認</a>
+      <a href="{{ url_for('companies') }}">会社設定</a>
+      <a href="{{ url_for('logout') }}" class="nav-logout">ログアウト</a>
+    </nav>
+    {% endif %}
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <ul class="messages">
+    {% for category, message in messages %}
+    <li class="{{ category }}">{{ message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% endwith %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', filename='clock.js') }}" defer></script>
+</body>
+
+</html>

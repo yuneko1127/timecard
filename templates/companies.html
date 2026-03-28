@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h2>会社設定</h2>
+  <form method="post" class="inline-form">
+    <input type="hidden" name="action" value="add" />
+    <label>新規会社名
+      <input name="name" required />
+    </label>
+    <button type="submit">追加</button>
+  </form>
+</section>
+
+<section class="card">
+  <h3>登録済み会社</h3>
+  <form method="post" class="companies-bulk-form">
+    <input type="hidden" name="action" value="update_all" />
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>会社名</th><th>有効</th></tr>
+      </thead>
+      <tbody>
+        {% for c in companies %}
+        <tr>
+          <td>{{ c.id }}</td>
+          <td>
+            <input name="name_{{ c.id }}" value="{{ c.name }}" required />
+          </td>
+          <td>
+            <input
+              type="checkbox"
+              name="active_{{ c.id }}"
+              {% if c.is_active %}checked{% endif %}
+            />
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">会社が登録されていません。</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if companies %}
+    <p class="companies-bulk-actions">
+      <button type="submit">変更を保存</button>
+    </p>
+    {% endif %}
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h2>打刻画面</h2>
+  {% if companies %}
+  <div class="punch-by-company">
+    {% for c in companies %}
+    <div class="punch-company-block">
+      <h3 class="punch-company-title">{{ c.name }}</h3>
+      <form method="post" class="punch-company-form">
+        <input type="hidden" name="company_id" value="{{ c.id }}" />
+        <div class="button-row punch-button-row">
+          <button name="event_type" value="clock_in" type="submit">出勤</button>
+          <button name="event_type" value="clock_out" type="submit">退勤</button>
+          <button name="event_type" value="break_start" type="submit">休憩入り</button>
+          <button name="event_type" value="break_end" type="submit">休憩終り</button>
+        </div>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p>有効な会社がありません。<a href="{{ url_for('companies') }}">会社設定</a>で会社を追加・有効化してください。</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h3>最新10件</h3>
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr><th>日時</th><th>会社</th><th>種別</th></tr>
+    </thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td>{{ e.event_at[:16].replace('T', ' ') }}</td>
+        <td>{{ e.company_name }}</td>
+        <td>{{ labels[e.event_type] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3">まだ打刻がありません。</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

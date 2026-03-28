@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h2>ログイン</h2>
+  <form method="post">
+    <label>ログインID
+      <input name="login_id" required />
+    </label>
+    <label>パスワード
+      <input name="password" type="password" required />
+    </label>
+    <button type="submit">ログイン</button>
+  </form>
+</section>
+{% endblock %}

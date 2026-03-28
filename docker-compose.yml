@@ -1,0 +1,16 @@
+# ローカルで PostgreSQL を試す場合: docker compose up -d
+# アプリ側: export DATABASE_URL=postgresql://timecard:timecard@127.0.0.1:5432/timecard
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: timecard
+      POSTGRES_PASSWORD: timecard
+      POSTGRES_DB: timecard
+    ports:
+      - "5432:5432"
+    volumes:
+      - timecard_pgdata:/var/lib/postgresql/data
+
+volumes:
+  timecard_pgdata:
