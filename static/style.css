@@ -278,9 +278,62 @@ button:focus-visible {
 
 .punch-company-title {
   font-size: 1rem;
-  margin: 0 0 12px;
+  margin: 0;
   color: var(--color-main);
   font-weight: 700;
+}
+
+.punch-company-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.punch-company-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.punch-state-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #b8bcc6;
+  box-shadow: 0 0 0 3px rgba(184, 188, 198, 0.25);
+}
+
+.punch-company-state--work .punch-state-dot {
+  background: #2d8a54;
+  box-shadow: 0 0 0 3px rgba(45, 138, 84, 0.22);
+}
+
+.punch-company-state--break .punch-state-dot {
+  background: #c9a227;
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.22);
+}
+
+.punch-company-state--off .punch-state-dot {
+  background: #b8bcc6;
+  box-shadow: 0 0 0 3px rgba(184, 188, 198, 0.25);
+}
+
+.punch-company-state--work {
+  color: #1f6b3f;
+}
+
+.punch-company-state--break {
+  color: #8d6a00;
+}
+
+.punch-company-state--off {
+  color: #5c6674;
 }
 
 .punch-company-form {
