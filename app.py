@@ -158,8 +158,8 @@ def create_app() -> Flask:
                     ) AS rn
                 FROM time_events te
                 WHERE te.user_id = ?
-            )
-            WHERE rn = 1
+            ) AS latest
+            WHERE latest.rn = 1
             ORDER BY company_id ASC
             """,
             (session["user_id"],),
