@@ -143,11 +143,44 @@ def create_app() -> Flask:
             (session["user_id"],),
         ).fetchall()
 
+        # 会社ごとの最新イベントから勤務状態を判定する
+        company_states: dict[str, dict[str, str]] = {}
+        all_latest_events = g.db.execute(
+            """
+            SELECT company_id, event_type
+            FROM (
+                SELECT
+                    te.company_id,
+                    te.event_type,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY te.company_id
+                        ORDER BY te.event_at DESC, te.id DESC
+                    ) AS rn
+                FROM time_events te
+                WHERE te.user_id = ?
+            ) AS latest
+            WHERE latest.rn = 1
+            ORDER BY company_id ASC
+            """,
+            (session["user_id"],),
+        ).fetchall()
+        for r in all_latest_events:
+            cid = str(r["company_id"])
+            event_type = r["event_type"]
+            if event_type == "break_start":
+                company_states[cid] = {"kind": "break", "label": "休憩中"}
+            elif event_type == "clock_out":
+                company_states[cid] = {"kind": "off", "label": "勤務外"}
+            else:
+                # clock_in または break_end（または想定外の値）=> 勤務中として扱う
+                company_states[cid] = {"kind": "work", "label": "勤務中"}
+
         return render_template(
             "punch.html",
             companies=active_companies,
             events=latest_events,
             labels=EVENT_LABELS,
+            company_states=company_states,
         )
 
     @app.route("/attendance")

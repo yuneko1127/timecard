@@ -7,7 +7,20 @@
   <div class="punch-by-company">
     {% for c in companies %}
     <div class="punch-company-block">
-      <h3 class="punch-company-title">{{ c.name }}</h3>
+      {% set info = company_states.get(c.id|string) %}
+      {% set state_label = info.label if info else '勤務外' %}
+      {% set state_kind = info.kind if info else 'off' %}
+      <div class="punch-company-title-row">
+        <h3 class="punch-company-title">{{ c.name }}</h3>
+        <span
+          class="punch-company-state punch-company-state--{{ state_kind }}"
+          title="{{ state_label }}"
+          aria-label="{{ state_label }}"
+        >
+          <span class="punch-state-dot" aria-hidden="true"></span>
+          <span class="punch-state-text">{{ state_label }}</span>
+        </span>
+      </div>
       <form method="post" class="punch-company-form">
         <input type="hidden" name="company_id" value="{{ c.id }}" />
         <div class="button-row punch-button-row">
