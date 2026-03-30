@@ -147,17 +147,25 @@ def create_app() -> Flask:
         company_states: dict[str, dict[str, str]] = {}
         all_latest_events = g.db.execute(
             """
-            SELECT te.company_id, te.event_type, te.event_at
-            FROM time_events te
-            WHERE te.user_id = ?
-            ORDER BY te.company_id ASC, te.event_at DESC
+            SELECT company_id, event_type
+            FROM (
+                SELECT
+                    te.company_id,
+                    te.event_type,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY te.company_id
+                        ORDER BY te.event_at DESC, te.id DESC
+                    ) AS rn
+                FROM time_events te
+                WHERE te.user_id = ?
+            )
+            WHERE rn = 1
+            ORDER BY company_id ASC
             """,
             (session["user_id"],),
         ).fetchall()
         for r in all_latest_events:
             cid = str(r["company_id"])
-            if cid in company_states:
-                continue  # 既にこの会社の最新イベントを取っている
             event_type = r["event_type"]
             if event_type == "break_start":
                 company_states[cid] = {"kind": "break", "label": "休憩中"}
