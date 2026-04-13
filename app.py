@@ -728,7 +728,7 @@ def build_attendance_summary(
     query_end = datetime.combine(next_first, time(ATTENDANCE_DAY_START_HOUR, 0, 0), tzinfo=JST)
 
     query = """
-        SELECT te.event_type, te.event_at, c.name AS company_name
+        SELECT te.company_id, te.event_type, te.event_at, c.name AS company_name
         FROM time_events te
         JOIN companies c ON c.id = te.company_id
         WHERE te.user_id = ? AND te.event_at >= ? AND te.event_at < ?
@@ -752,8 +752,7 @@ def build_attendance_summary(
         day_date = target_month.replace(day=day)
         day_key = day_date.strftime("%Y-%m-%d")
         day_rows = grouped.get(day_key, [])
-        shifts, day_level_warnings = calculate_day_shifts(day_rows)
-        if not shifts:
+        if not day_rows:
             summary.append(
                 {
                     "date": day_key,
@@ -771,27 +770,67 @@ def build_attendance_summary(
             )
             continue
 
-        for idx, shift in enumerate(shifts):
-            row_warning = shift.warning
-            if idx == 0 and day_level_warnings:
-                merged_day = " / ".join(day_level_warnings)
-                row_warning = (
-                    f"{row_warning} / {merged_day}" if row_warning else merged_day
+        rows_by_company: dict[int, list[Any]] = defaultdict(list)
+        for row in day_rows:
+            rows_by_company[int(row["company_id"])].append(row)
+
+        ordered_company_ids = sorted(
+            rows_by_company.keys(),
+            key=lambda cid: (
+                datetime.fromisoformat(rows_by_company[cid][0]["event_at"]),
+                cid,
+            ),
+        )
+
+        day_output_rows: list[dict[str, str | int | None]] = []
+        for cid in ordered_company_ids:
+            company_rows = rows_by_company[cid]
+            shifts, day_level_warnings = calculate_day_shifts(company_rows)
+            for idx, shift in enumerate(shifts):
+                row_warning = shift.warning
+                if idx == 0 and day_level_warnings:
+                    merged_day = " / ".join(day_level_warnings)
+                    row_warning = (
+                        f"{row_warning} / {merged_day}" if row_warning else merged_day
+                    )
+                day_output_rows.append(
+                    {
+                        "date": "",
+                        "company_name": shift.company_name,
+                        "clock_in": shift.clock_in,
+                        "clock_out": shift.clock_out,
+                        "break_start": shift.break_start,
+                        "break_end": shift.break_end,
+                        "break_minutes": shift.break_minutes,
+                        "work_minutes": shift.work_minutes,
+                        "net_minutes": shift.net_minutes,
+                        "warning": row_warning,
+                        "has_data": True,
+                    }
                 )
+
+        if not day_output_rows:
             summary.append(
                 {
-                    "date": day_key if idx == 0 else "",
-                    "company_name": shift.company_name,
-                    "clock_in": shift.clock_in,
-                    "clock_out": shift.clock_out,
-                    "break_start": shift.break_start,
-                    "break_end": shift.break_end,
-                    "break_minutes": shift.break_minutes,
-                    "work_minutes": shift.work_minutes,
-                    "net_minutes": shift.net_minutes,
-                    "warning": row_warning,
-                    "has_data": True,
+                    "date": day_key,
+                    "company_name": "",
+                    "clock_in": "-",
+                    "clock_out": "-",
+                    "break_start": "-",
+                    "break_end": "-",
+                    "break_minutes": 0,
+                    "work_minutes": 0,
+                    "net_minutes": 0,
+                    "warning": None,
+                    "has_data": False,
                 }
+            )
+            continue
+
+        for idx, row in enumerate(day_output_rows):
+            row["date"] = day_key if idx == 0 else ""
+            summary.append(
+                row
             )
     return summary
 
@@ -918,18 +957,27 @@ def flatten_warning_messages(warning: str | None) -> list[str]:
 
 
 def collect_day_warning_messages(rows: list[Any]) -> list[str]:
-    shifts, day_warnings = calculate_day_shifts(rows)
     seen: set[str] = set()
     ordered: list[str] = []
-    for msg in day_warnings:
-        if msg not in seen:
-            seen.add(msg)
-            ordered.append(msg)
-    for shift in shifts:
-        for msg in flatten_warning_messages(shift.warning):
+
+    rows_by_company: dict[int, list[Any]] = defaultdict(list)
+    for row in rows:
+        if "company_id" in row.keys():
+            rows_by_company[int(row["company_id"])].append(row)
+        else:
+            rows_by_company[0].append(row)
+
+    for company_rows in rows_by_company.values():
+        shifts, day_warnings = calculate_day_shifts(company_rows)
+        for msg in day_warnings:
             if msg not in seen:
                 seen.add(msg)
                 ordered.append(msg)
+        for shift in shifts:
+            for msg in flatten_warning_messages(shift.warning):
+                if msg not in seen:
+                    seen.add(msg)
+                    ordered.append(msg)
     return ordered
 
 
