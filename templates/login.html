@@ -4,9 +4,15 @@
 <section class="card">
   <h2>ログイン</h2>
   <form method="post">
-    <label>ログインID
-      <input name="login_id" required />
+    {% if use_supabase_auth %}
+    <label>メールアドレス
+      <input name="email" type="email" required />
     </label>
+    {% else %}
+    <label>ログインID
+      <input name="email" required />
+    </label>
+    {% endif %}
     <label>パスワード
       <input name="password" type="password" required />
     </label>

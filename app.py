@@ -5,6 +5,7 @@ import sqlite3
 import calendar
 import csv
 import io
+from urllib.parse import urlsplit, urlunsplit
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
@@ -23,7 +24,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, Paragraph
-from werkzeug.security import check_password_hash, generate_password_hash
+from supabase import create_client, Client
+from jose import JWTError, jwt
 
 # .env ファイルから環境変数を読み込む
 load_dotenv()
@@ -36,12 +38,21 @@ def _normalize_database_url(url: str) -> str:
     """Heroku/一部ホストの postgres:// を psycopg2 が確実に解釈できる形にする。"""
     if url.startswith("postgres://"):
         return "postgresql://" + url[len("postgres://") :]
+
+    # Supabase の session pooler は 5432 だと接続上限に達しやすいので、
+    # transaction pooler の 6543 を優先する。
+    if "pooler.supabase.com" in url:
+        parsed = urlsplit(url)
+        if parsed.port == 5432:
+            netloc = parsed.netloc.rsplit(":", 1)[0] + ":6543"
+            url = urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
     return url
 
 
 DATABASE_URL = _normalize_database_url(os.environ.get("DATABASE_URL", "").strip())
-DEFAULT_LOGIN_ID = os.environ.get("INITIAL_LOGIN_ID", "").strip()
-DEFAULT_PASSWORD = os.environ.get("INITIAL_PASSWORD", "").strip()
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+USE_SUPABASE_AUTH = bool(SUPABASE_URL and SUPABASE_KEY)
 EVENT_TYPES = {"clock_in", "clock_out", "break_start", "break_end"}
 EVENT_LABELS = {
     "clock_in": "出勤",
@@ -57,42 +68,88 @@ def create_app() -> Flask:
     app.config["DATABASE_URL"] = DATABASE_URL
     app.config["DATABASE_PATH"] = DB_PATH
 
+    # Supabase クライアント初期化
+    if USE_SUPABASE_AUTH:
+        app.config["SUPABASE"] = create_client(SUPABASE_URL, SUPABASE_KEY)
+    else:
+        app.config["SUPABASE"] = None
+
     @app.before_request
     def before_request() -> None:
         g.db = get_db()
-
-    @app.teardown_request
-    def teardown_request(exception: Exception | None) -> None:
-        db = g.pop("db", None)
-        if db:
-            db.close()
-
-    @app.route("/")
-    def index():
-        if not session.get("user_id"):
-            return redirect(url_for("login"))
-        return redirect(url_for("punch"))
+        g.user_id = session.get("user_id")
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if request.method == "POST":
-            login_id = request.form.get("login_id", "").strip()
+            email = request.form.get("email", "").strip()
             password = request.form.get("password", "")
-            user = g.db.execute(
-                "SELECT id, login_id, password_hash FROM users WHERE login_id = ?",
-                (login_id,),
-            ).fetchone()
-            if user and check_password_hash(user["password_hash"], password):
+
+            if not USE_SUPABASE_AUTH:
+                flash("Supabase Auth が有効ではありません。SUPABASE_URL と SUPABASE_KEY を設定してください。", "error")
+                return render_template("login.html", use_supabase_auth=True)
+
+            try:
+                supabase: Client = app.config["SUPABASE"]
+                response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                user = getattr(response, "user", None)
+                session_data = getattr(response, "session", None)
+                if not user or not session_data:
+                    flash("ログインに失敗しました。", "error")
+                    return render_template("login.html", use_supabase_auth=True)
+
+                local_user = g.db.execute(
+                    "SELECT id FROM users WHERE supabase_id = ?",
+                    (user.id,),
+                ).fetchone()
+                if not local_user:
+                    local_user = g.db.execute(
+                        "SELECT id FROM users WHERE login_id = ?",
+                        (email,),
+                    ).fetchone()
+
+                if not local_user:
+                    g.db.execute(
+                        "INSERT INTO users (login_id, supabase_id) VALUES (?, ?)",
+                        (email, user.id),
+                    )
+                    g.db.commit()
+                    local_user = g.db.execute(
+                        "SELECT id FROM users WHERE supabase_id = ?",
+                        (user.id,),
+                    ).fetchone()
+
+                if not local_user:
+                    flash("ローカルユーザーの作成に失敗しました。", "error")
+                    return render_template("login.html", use_supabase_auth=True)
+
+                g.db.execute(
+                    "UPDATE users SET supabase_id = ? WHERE id = ?",
+                    (user.id, local_user["id"]),
+                )
+                g.db.commit()
                 session.clear()
-                session["user_id"] = user["id"]
-                session["login_id"] = user["login_id"]
+                session["access_token"] = session_data.access_token
+                session["refresh_token"] = session_data.refresh_token
+                session["user_id"] = local_user["id"]
+                session["login_id"] = email
+                session["supabase_user_id"] = user.id
+                session["user_email"] = getattr(user, "email", email)
                 return redirect(url_for("punch"))
-            flash("ログインIDまたはパスワードが正しくありません。", "error")
-        return render_template("login.html")
+            except Exception as exc:
+                flash(f"ログインに失敗しました: {exc}", "error")
+
+        return render_template("login.html", use_supabase_auth=USE_SUPABASE_AUTH)
 
     @app.route("/logout")
     @login_required
     def logout():
+        if USE_SUPABASE_AUTH:
+            try:
+                supabase: Client = app.config["SUPABASE"]
+                supabase.auth.sign_out()
+            except Exception:
+                pass
         session.clear()
         flash("ログアウトしました。", "info")
         return redirect(url_for("login"))
@@ -521,8 +578,14 @@ def create_app() -> Flask:
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if not session.get("user_id"):
-            return redirect(url_for("login"))
+        # Supabase Auth を使用している場合
+        if USE_SUPABASE_AUTH:
+            if not session.get("access_token"):
+                return redirect(url_for("login"))
+        else:
+            # 従来のセッション認証
+            if not session.get("user_id"):
+                return redirect(url_for("login"))
         return view(*args, **kwargs)
 
     return wrapped
@@ -582,6 +645,31 @@ def init_db(app: Flask) -> None:
         _init_db_sqlite(app.config["DATABASE_PATH"])
 
 
+def _ensure_supabase_id_column_sqlite(conn: sqlite3.Connection) -> None:
+    columns = conn.execute("PRAGMA table_info(users)").fetchall()
+    column_names = {row[1] for row in columns}
+    if "supabase_id" not in column_names:
+        conn.execute("ALTER TABLE users ADD COLUMN supabase_id TEXT")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_supabase_id ON users(supabase_id)")
+
+
+def _ensure_supabase_id_column_postgres(raw: Any) -> None:
+    cur = raw.cursor()
+    cur.execute(
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'supabase_id'
+        LIMIT 1
+        """
+    )
+    if cur.fetchone() is None:
+        cur.execute("ALTER TABLE users ADD COLUMN supabase_id TEXT")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_supabase_id ON users(supabase_id)")
+    raw.commit()
+    cur.close()
+
+
 def _init_db_sqlite(db_path: str) -> None:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -590,7 +678,8 @@ def _init_db_sqlite(db_path: str) -> None:
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             login_id TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL
+            password_hash TEXT,
+            supabase_id TEXT UNIQUE
         );
 
         CREATE TABLE IF NOT EXISTS companies (
@@ -610,15 +699,8 @@ def _init_db_sqlite(db_path: str) -> None:
         );
         """
     )
+    _ensure_supabase_id_column_sqlite(conn)
     # 初期ユーザーは環境変数で指定された場合のみ作成
-    if DEFAULT_LOGIN_ID and DEFAULT_PASSWORD:
-        user = conn.execute("SELECT id FROM users WHERE login_id = ?", (DEFAULT_LOGIN_ID,)).fetchone()
-        if not user:
-            conn.execute(
-                "INSERT INTO users (login_id, password_hash) VALUES (?, ?)",
-                (DEFAULT_LOGIN_ID, generate_password_hash(DEFAULT_PASSWORD)),
-            )
-
     company = conn.execute("SELECT id FROM companies LIMIT 1").fetchone()
     if not company:
         conn.execute("INSERT INTO companies (name, is_active) VALUES (?, 1)", ("デフォルト会社",))
@@ -634,7 +716,8 @@ def _init_db_postgres() -> None:
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             login_id TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL
+            password_hash TEXT,
+            supabase_id TEXT UNIQUE
         )
         """
     )
@@ -661,17 +744,10 @@ def _init_db_postgres() -> None:
     raw.commit()
     cur.close()
 
+    _ensure_supabase_id_column_postgres(raw)
+
     db = PgConnection(raw)
     # 初期ユーザーは環境変数で指定された場合のみ作成
-    if DEFAULT_LOGIN_ID and DEFAULT_PASSWORD:
-        user = db.execute("SELECT id FROM users WHERE login_id = ?", (DEFAULT_LOGIN_ID,)).fetchone()
-        if not user:
-            db.execute(
-                "INSERT INTO users (login_id, password_hash) VALUES (?, ?)",
-                (DEFAULT_LOGIN_ID, generate_password_hash(DEFAULT_PASSWORD)),
-            )
-            db.commit()
-
     company = db.execute("SELECT id FROM companies LIMIT 1").fetchone()
     if not company:
         db.execute("INSERT INTO companies (name, is_active) VALUES (?, 1)", ("デフォルト会社",))

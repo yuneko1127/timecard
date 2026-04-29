@@ -1,6 +1,6 @@
 # タイムカードアプリ
 
-Flask で動く日本語タイムカードアプリです。**本番利用では PostgreSQL** を想定しています（環境変数 `DATABASE_URL`）。`DATABASE_URL` が無い場合のみ、開発用にローカル SQLite（`timecard.db`）を使います。
+Flask で動く日本語タイムカードアプリです。**ログインは Supabase Auth（メールアドレス + パスワード）** を使います。**本番利用では PostgreSQL** を想定しています（環境変数 `DATABASE_URL`）。`DATABASE_URL` が無い場合のみ、開発用にローカル SQLite（`timecard.db`）を使います。
 
 ## セットアップ（.venv）
 
@@ -20,6 +20,8 @@ pip install -r requirements.txt
 ```bash
 export DATABASE_URL="postgresql://ユーザー:パスワード@ホスト:5432/データベース名"
 export SECRET_KEY="ランダムな長い文字列"   # 本番では必須
+export SUPABASE_URL="https://your-project.supabase.co"
+export SUPABASE_KEY="publishable key"
 python app.py
 ```
 
@@ -53,22 +55,31 @@ python app.py
 **開発環境での例：**
 ```bash
 source .venv/bin/activate
-export INITIAL_LOGIN_ID="admin"
-export INITIAL_PASSWORD="secure_password"
+export SUPABASE_URL="https://your-project.supabase.co"
+export SUPABASE_KEY="publishable key"
 python app.py
 ```
 
 または、ターミナルセッション内で直接設定：
 ```bash
-INITIAL_LOGIN_ID="admin" INITIAL_PASSWORD="secure_password" python app.py
+SUPABASE_URL="https://your-project.supabase.co" SUPABASE_KEY="publishable key" python app.py
 ```
 
 **本番環境（Render 等）での設定：**
 - プラットフォームのダッシュボードで環境変数を設定してください
   - `DATABASE_URL` … 接続文字列（PostgreSQL）
   - `SECRET_KEY` … Flask セッション用のランダム文字列
-  - `INITIAL_LOGIN_ID` … 初期ログインID
-  - `INITIAL_PASSWORD` … 初期パスワード
+  - `SUPABASE_URL` … Supabase の Project URL
+  - `SUPABASE_KEY` … Publishable key
+
+**Supabase Auth を使う場合：**
+- ログイン画面はメールアドレス + パスワードです
+- `SUPABASE_SERVICE_ROLE_KEY` … 通常は不要。Supabase の管理APIを使うときだけ設定
+- 既存ユーザーのローカル紐付けが必要な場合のみ `migrate_to_supabase_auth.py` を使います
+
+**Render の PostgreSQL で Supabase の pooler を使う場合：**
+- `pooler.supabase.com` を使うときは `5432` ではなく `6543`（transaction mode）を使ってください
+- アプリ側で `postgres://` は `postgresql://` に正規化します
 
 既存の `timecard.db` がある場合は、別途ダンプ・リストア（`pgloader` や CSV 経由など）で移行してください。スキーマは `app.py` の `_init_db_postgres` / `_init_db_sqlite` を参照してください。
 
