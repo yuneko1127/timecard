@@ -12,6 +12,7 @@ from functools import wraps
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
@@ -24,6 +25,8 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, Paragraph
 from werkzeug.security import check_password_hash, generate_password_hash
 
+# .env ファイルから環境変数を読み込む
+load_dotenv()
 
 JST = ZoneInfo("Asia/Tokyo")
 # 勤怠日の区切り: 当日 4:00 〜 翌日 3:59（日本時間）
@@ -37,8 +40,8 @@ def _normalize_database_url(url: str) -> str:
 
 
 DATABASE_URL = _normalize_database_url(os.environ.get("DATABASE_URL", "").strip())
-DEFAULT_LOGIN_ID = "yuneko"
-DEFAULT_PASSWORD = "timecard123"
+DEFAULT_LOGIN_ID = os.environ.get("INITIAL_LOGIN_ID", "").strip()
+DEFAULT_PASSWORD = os.environ.get("INITIAL_PASSWORD", "").strip()
 EVENT_TYPES = {"clock_in", "clock_out", "break_start", "break_end"}
 EVENT_LABELS = {
     "clock_in": "出勤",
@@ -607,12 +610,14 @@ def _init_db_sqlite(db_path: str) -> None:
         );
         """
     )
-    user = conn.execute("SELECT id FROM users WHERE login_id = ?", (DEFAULT_LOGIN_ID,)).fetchone()
-    if not user:
-        conn.execute(
-            "INSERT INTO users (login_id, password_hash) VALUES (?, ?)",
-            (DEFAULT_LOGIN_ID, generate_password_hash(DEFAULT_PASSWORD)),
-        )
+    # 初期ユーザーは環境変数で指定された場合のみ作成
+    if DEFAULT_LOGIN_ID and DEFAULT_PASSWORD:
+        user = conn.execute("SELECT id FROM users WHERE login_id = ?", (DEFAULT_LOGIN_ID,)).fetchone()
+        if not user:
+            conn.execute(
+                "INSERT INTO users (login_id, password_hash) VALUES (?, ?)",
+                (DEFAULT_LOGIN_ID, generate_password_hash(DEFAULT_PASSWORD)),
+            )
 
     company = conn.execute("SELECT id FROM companies LIMIT 1").fetchone()
     if not company:
@@ -657,13 +662,15 @@ def _init_db_postgres() -> None:
     cur.close()
 
     db = PgConnection(raw)
-    user = db.execute("SELECT id FROM users WHERE login_id = ?", (DEFAULT_LOGIN_ID,)).fetchone()
-    if not user:
-        db.execute(
-            "INSERT INTO users (login_id, password_hash) VALUES (?, ?)",
-            (DEFAULT_LOGIN_ID, generate_password_hash(DEFAULT_PASSWORD)),
-        )
-        db.commit()
+    # 初期ユーザーは環境変数で指定された場合のみ作成
+    if DEFAULT_LOGIN_ID and DEFAULT_PASSWORD:
+        user = db.execute("SELECT id FROM users WHERE login_id = ?", (DEFAULT_LOGIN_ID,)).fetchone()
+        if not user:
+            db.execute(
+                "INSERT INTO users (login_id, password_hash) VALUES (?, ?)",
+                (DEFAULT_LOGIN_ID, generate_password_hash(DEFAULT_PASSWORD)),
+            )
+            db.commit()
 
     company = db.execute("SELECT id FROM companies LIMIT 1").fetchone()
     if not company:

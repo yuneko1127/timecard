@@ -46,16 +46,31 @@ python app.py
 
 `http://127.0.0.1:5000` にアクセスしてください。
 
-## SQLite から PostgreSQL へデータ移行
+### 環境変数の設定
+
+`.env.example` を参考に、環境変数を設定してください：
+
+**開発環境での例：**
+```bash
+source .venv/bin/activate
+export INITIAL_LOGIN_ID="admin"
+export INITIAL_PASSWORD="secure_password"
+python app.py
+```
+
+または、ターミナルセッション内で直接設定：
+```bash
+INITIAL_LOGIN_ID="admin" INITIAL_PASSWORD="secure_password" python app.py
+```
+
+**本番環境（Render 等）での設定：**
+- プラットフォームのダッシュボードで環境変数を設定してください
+  - `DATABASE_URL` … 接続文字列（PostgreSQL）
+  - `SECRET_KEY` … Flask セッション用のランダム文字列
+  - `INITIAL_LOGIN_ID` … 初期ログインID
+  - `INITIAL_PASSWORD` … 初期パスワード
 
 既存の `timecard.db` がある場合は、別途ダンプ・リストア（`pgloader` や CSV 経由など）で移行してください。スキーマは `app.py` の `_init_db_postgres` / `_init_db_sqlite` を参照してください。
-
-## 初期ログイン情報
-
-- ログインID: `yuneko`
-- パスワード: `timecard123`
-
-（DB が空のときだけ自動作成されます。）
 
 ---
 
@@ -69,6 +84,8 @@ python app.py
 4. 環境変数:
    - `DATABASE_URL` … Supabase の URI（多くは **`?sslmode=require`** 付き）
    - `SECRET_KEY` … 長いランダム文字列（例: `python3 -c "import secrets; print(secrets.token_hex(32))"`）
+   - `INITIAL_LOGIN_ID` … 初期ログインID（例: `admin`）
+   - `INITIAL_PASSWORD` … 初期パスワード（十分に強力なパスワード）
 5. **Build**: `pip install -r requirements.txt`  
    **Start**: `gunicorn app:app --bind 0.0.0.0:$PORT`  
    （`Procfile` と同内容）
