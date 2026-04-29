@@ -195,7 +195,7 @@ def create_app() -> Flask:
             """
             SELECT te.event_type, te.event_at, c.name AS company_name
             FROM time_events te
-            JOIN companies c ON c.id = te.company_id
+            JOIN companies c ON c.id = te.company_id AND c.is_active = 1
             WHERE te.user_id = ?
             ORDER BY te.event_at DESC
             LIMIT 10
@@ -258,7 +258,7 @@ def create_app() -> Flask:
             return redirect(url_for("attendance"))
 
         companies = g.db.execute(
-            "SELECT id, name, is_active FROM companies ORDER BY id"
+            "SELECT id, name FROM companies WHERE is_active = 1 ORDER BY id"
         ).fetchall()
         company_map = {str(c["id"]): c["name"] for c in companies}
         selected_company_name = "全会社"
@@ -813,7 +813,7 @@ def build_attendance_summary(
     query = """
         SELECT te.company_id, te.event_type, te.event_at, c.name AS company_name
         FROM time_events te
-        JOIN companies c ON c.id = te.company_id
+        JOIN companies c ON c.id = te.company_id AND c.is_active = 1
         WHERE te.user_id = ? AND te.event_at >= ? AND te.event_at < ?
     """
     params: list[str | int] = [user_id, query_start.isoformat(), query_end.isoformat()]
