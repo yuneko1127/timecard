@@ -127,7 +127,7 @@
       </thead>
       <tbody>
         {% for r in summary %}
-        <tr>
+        <tr{% if r.day_key == today_key %} class="is-today"{% endif %}>
           <td>
             {% if r.date %}
             <a href="{{ url_for('attendance_day_edit', day_key=r.date, month=month) }}">{{ r.date }}</a>

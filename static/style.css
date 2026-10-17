@@ -627,6 +627,23 @@ tbody tr:hover {
   background: var(--color-main-softer);
 }
 
+.attendance-detail-table tbody tr.is-today {
+  background: var(--color-main-soft);
+  font-weight: 600;
+}
+
+.attendance-detail-table tbody tr.is-today:hover {
+  background: rgba(65, 50, 166, 0.18);
+}
+
+.attendance-detail-table tbody tr.is-today td:first-child {
+  box-shadow: inset 4px 0 0 var(--color-main);
+}
+
+.attendance-detail-table tbody tr.is-today td:first-child a {
+  font-weight: 800;
+}
+
 .multi-time {
   margin: 0;
   font-family: inherit;

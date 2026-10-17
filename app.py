@@ -249,8 +249,9 @@ def create_app() -> Flask:
         month = request.args.get("month")
         company_id = request.args.get("company_id", "all")
         now = datetime.now(JST)
+        today_key = attendance_day_key(now)
         if not month:
-            month = now.strftime("%Y-%m")
+            month = today_key[:7]
         try:
             target_month = datetime.strptime(month, "%Y-%m")
         except ValueError:
@@ -288,6 +289,7 @@ def create_app() -> Flask:
             selected_company_id=company_id,
             company_totals=company_totals,
             grand_total_minutes=grand_total_minutes,
+            today_key=today_key,
         )
 
     @app.route("/attendance/day/<day_key>", methods=["GET", "POST"])
@@ -839,6 +841,7 @@ def build_attendance_summary(
             summary.append(
                 {
                     "date": day_key,
+                    "day_key": day_key,
                     "company_name": "",
                     "clock_in": "-",
                     "clock_out": "-",
@@ -879,6 +882,7 @@ def build_attendance_summary(
                 day_output_rows.append(
                     {
                         "date": "",
+                        "day_key": day_key,
                         "company_name": shift.company_name,
                         "clock_in": shift.clock_in,
                         "clock_out": shift.clock_out,
@@ -896,6 +900,7 @@ def build_attendance_summary(
             summary.append(
                 {
                     "date": day_key,
+                    "day_key": day_key,
                     "company_name": "",
                     "clock_in": "-",
                     "clock_out": "-",
