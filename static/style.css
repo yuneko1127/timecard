@@ -501,10 +501,14 @@ button:focus-visible {
   border: 0;
 }
 
-.month-stepper-label {
+.month-stepper {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.month-stepper-label {
+  display: block;
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--color-text-muted);
@@ -530,29 +534,21 @@ button:focus-visible {
   border-radius: 0;
   margin: 0;
   min-height: 42px;
+  text-align: center;
 }
 
 .month-input-with-spin input[type="month"]:focus {
   box-shadow: none;
 }
 
-.month-spin-btns {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  border-left: 1px solid var(--color-border);
-}
-
-.month-step-btn.month-step-up,
-.month-step-btn.month-step-down {
+.month-step-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.25rem;
-  min-height: 0;
-  flex: 1;
-  padding: 0 8px;
-  font-size: 11px;
+  min-width: 2.5rem;
+  min-height: 42px;
+  padding: 0 10px;
+  font-size: 13px;
   line-height: 1;
   border-radius: 0;
   border: none;
@@ -560,28 +556,32 @@ button:focus-visible {
   color: var(--color-main);
   text-decoration: none;
   font-weight: 700;
+  transition: background 0.15s ease, color 0.15s ease;
+  user-select: none;
 }
 
-.month-step-btn.month-step-up {
-  border-bottom: 1px solid var(--color-border);
+.month-step-btn.month-step-prev {
+  border-right: 1px solid var(--color-border);
 }
 
-.month-step-btn.month-step-up:hover,
-.month-step-btn.month-step-down:hover {
+.month-step-btn.month-step-next {
+  border-left: 1px solid var(--color-border);
+}
+
+.month-step-btn:hover {
   background: var(--color-main-soft);
   color: var(--color-main-hover);
 }
 
-.month-step-btn.month-step-up:active,
-.month-step-btn.month-step-down:active {
+.month-step-btn:active {
   background: var(--color-main-softer);
 }
 
-main .month-spin-btns a.month-step-btn {
+main a.month-step-btn {
   border-bottom: none;
 }
 
-.month-spin-btns a.month-step-btn:focus-visible {
+.month-step-btn:focus-visible {
   outline: 2px solid var(--color-main);
   outline-offset: -2px;
   z-index: 1;

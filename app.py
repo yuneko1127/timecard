@@ -79,8 +79,23 @@ def create_app() -> Flask:
         g.db = get_db()
         g.user_id = session.get("user_id")
 
+    @app.route("/")
+    def index():
+        if USE_SUPABASE_AUTH:
+            if session.get("access_token"):
+                return redirect(url_for("punch"))
+        elif session.get("user_id"):
+            return redirect(url_for("punch"))
+        return redirect(url_for("login"))
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
+        if request.method == "GET":
+            if USE_SUPABASE_AUTH:
+                if session.get("access_token"):
+                    return redirect(url_for("punch"))
+            elif session.get("user_id"):
+                return redirect(url_for("punch"))
         if request.method == "POST":
             email = request.form.get("email", "").strip()
             password = request.form.get("password", "")

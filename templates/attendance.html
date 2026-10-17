@@ -5,25 +5,22 @@
   <h2>勤怠確認（月次）</h2>
   <form method="get" class="inline-form attendance-filter-form" id="attendance-filter-form">
     <div class="month-stepper" role="group" aria-label="対象月の選択">
-      <label class="month-stepper-label">対象月
-        <span class="month-input-with-spin">
-          <input type="month" name="month" value="{{ month }}" />
-          <span class="month-spin-btns">
-            <a
-              class="month-step-btn month-step-up"
-              href="{{ url_for('attendance', month=next_month, company_id=selected_company_id) }}"
-              title="翌月"
-              aria-label="翌月へ"
-            >▲</a>
-            <a
-              class="month-step-btn month-step-down"
-              href="{{ url_for('attendance', month=prev_month, company_id=selected_company_id) }}"
-              title="前月"
-              aria-label="前月へ"
-            >▼</a>
-          </span>
-        </span>
-      </label>
+      <label for="month-input" class="month-stepper-label">対象月</label>
+      <div class="month-input-with-spin">
+        <a
+          class="month-step-btn month-step-prev"
+          href="{{ url_for('attendance', month=prev_month, company_id=selected_company_id) }}"
+          title="前月"
+          aria-label="前月へ"
+        >◀</a>
+        <input type="month" name="month" id="month-input" value="{{ month }}" />
+        <a
+          class="month-step-btn month-step-next"
+          href="{{ url_for('attendance', month=next_month, company_id=selected_company_id) }}"
+          title="翌月"
+          aria-label="翌月へ"
+        >▶</a>
+      </div>
     </div>
     <label>会社
       <select name="company_id">
