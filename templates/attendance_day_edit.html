@@ -36,6 +36,9 @@
         <td>{{ e.id }}<form id="upd-{{ e.id }}" method="post"></form></td>
         <td>
           <select name="company_id" form="upd-{{ e.id }}" required>
+            {% if e.company_id not in companies|map(attribute='id') %}
+            <option value="" disabled selected>非表示の会社（有効な会社を選択）</option>
+            {% endif %}
             {% for c in companies %}
             <option value="{{ c.id }}" {% if e.company_id == c.id %}selected{% endif %}>{{ c.name }}</option>
             {% endfor %}

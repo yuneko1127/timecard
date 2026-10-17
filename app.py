@@ -325,6 +325,13 @@ def create_app() -> Flask:
                 if action == "update":
                     event_id = int(request.form.get("event_id", "0"))
                     company_id = int(request.form.get("company_id", "0"))
+                    active_company = g.db.execute(
+                        "SELECT id FROM companies WHERE id = ? AND is_active = 1",
+                        (company_id,),
+                    ).fetchone()
+                    if not active_company:
+                        flash("選択された会社は無効か存在しません。", "error")
+                        return redirect(url_for("attendance_day_edit", day_key=day_key, month=return_month))
                     event_type = request.form.get("event_type", "")
                     event_time_raw = request.form.get("event_time", "")
                     if event_type not in EVENT_TYPES:
@@ -362,6 +369,13 @@ def create_app() -> Flask:
                         flash("削除対象の打刻が見つかりません。", "error")
                 elif action == "add":
                     company_id = int(request.form.get("company_id", "0"))
+                    active_company = g.db.execute(
+                        "SELECT id FROM companies WHERE id = ? AND is_active = 1",
+                        (company_id,),
+                    ).fetchone()
+                    if not active_company:
+                        flash("選択された会社は無効か存在しません。", "error")
+                        return redirect(url_for("attendance_day_edit", day_key=day_key, month=return_month))
                     event_type = request.form.get("event_type", "")
                     event_time_raw = request.form.get("event_time", "")
                     if event_type not in EVENT_TYPES:
@@ -410,7 +424,9 @@ def create_app() -> Flask:
             for r in rows
         ]
 
-        companies = g.db.execute("SELECT id, name FROM companies ORDER BY id").fetchall()
+        companies = g.db.execute(
+            "SELECT id, name FROM companies WHERE is_active = 1 ORDER BY id"
+        ).fetchall()
         default_add_time = "12:00"
         day_warning_messages = collect_day_warning_messages(list(rows))
         return render_template(
