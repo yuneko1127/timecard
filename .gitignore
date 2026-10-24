@@ -62,4 +62,8 @@ Desktop.ini
 *.tmp
 *.temp
 
+# Agent skills CLI (node_modules相当のスキルインストール先)
+.agents/
+.skills/
+
 admin/
