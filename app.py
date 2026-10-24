@@ -5,10 +5,13 @@ import sqlite3
 import calendar
 import csv
 import io
+import secrets
+import warnings
+from html import escape
 from urllib.parse import urlsplit, urlunsplit
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from functools import wraps
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -17,7 +20,19 @@ from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from flask import Flask, flash, g, make_response, redirect, render_template, request, session, url_for
+from flask import (
+    Flask,
+    abort,
+    current_app,
+    flash,
+    g,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet
@@ -64,9 +79,28 @@ EVENT_LABELS = {
 
 def create_app() -> Flask:
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
+
+    secret_key = os.environ.get("SECRET_KEY", "").strip()
+    if not secret_key or secret_key == "dev-secret-key-change-me":
+        if DATABASE_URL or os.environ.get("FLASK_ENV") == "production":
+            raise RuntimeError(
+                "本番環境（DATABASE_URLが設定されている環境等）では SECRET_KEY の設定が必須です。"
+                ".env または環境変数に推測不可能な SECRET_KEY を設定してください。"
+            )
+        secret_key = secrets.token_hex(32)
+        warnings.warn(
+            "SECRET_KEY が未設定または初期値のため、ランダムな一時キーを生成しました。"
+            "セッション永続化のため、.env に SECRET_KEY を設定してください。",
+            UserWarning,
+            stacklevel=2,
+        )
+    app.config["SECRET_KEY"] = secret_key
     app.config["DATABASE_URL"] = DATABASE_URL
     app.config["DATABASE_PATH"] = DB_PATH
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    if DATABASE_URL or os.environ.get("FLASK_ENV") == "production":
+        app.config["SESSION_COOKIE_SECURE"] = True
 
     # Supabase クライアント初期化
     if USE_SUPABASE_AUTH:
@@ -74,10 +108,31 @@ def create_app() -> Flask:
     else:
         app.config["SUPABASE"] = None
 
+    def generate_csrf_token() -> str:
+        if "csrf_token" not in session:
+            session["csrf_token"] = secrets.token_hex(32)
+        return session["csrf_token"]
+
+    @app.context_processor
+    def inject_csrf_token() -> dict[str, Any]:
+        return {"csrf_token": generate_csrf_token()}
+
     @app.before_request
     def before_request() -> None:
         g.db = get_db()
         g.user_id = session.get("user_id")
+
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
+            session_token = session.get("csrf_token")
+            if not token or not session_token or not secrets.compare_digest(token, session_token):
+                abort(400, description="CSRF token missing or invalid")
+
+    @app.teardown_appcontext
+    def teardown_db(exception: BaseException | None = None) -> None:
+        db = g.pop("db", None)
+        if db is not None:
+            db.close()
 
     @app.route("/")
     def index():
@@ -150,13 +205,15 @@ def create_app() -> Flask:
                 session["login_id"] = email
                 session["supabase_user_id"] = user.id
                 session["user_email"] = getattr(user, "email", email)
+                session["last_validated_at"] = datetime.now(timezone.utc).timestamp()
+                session["csrf_token"] = secrets.token_hex(32)
                 return redirect(url_for("punch"))
             except Exception as exc:
                 flash(f"ログインに失敗しました: {exc}", "error")
 
         return render_template("login.html", use_supabase_auth=USE_SUPABASE_AUTH)
 
-    @app.route("/logout")
+    @app.route("/logout", methods=["POST"])
     @login_required
     def logout():
         if USE_SUPABASE_AUTH:
@@ -555,7 +612,7 @@ def create_app() -> Flask:
             )
         )
 
-        title = Paragraph(f"勤怠確認 {month} / {selected_company_name}", styles["Title"])
+        title = Paragraph(f"勤怠確認 {month} / {escape(selected_company_name)}", styles["Title"])
         doc.build([title, Spacer(1, 12), table])
         pdf_bytes = buffer.getvalue()
         buffer.close()
@@ -608,12 +665,72 @@ def create_app() -> Flask:
     return app
 
 
+def ensure_valid_supabase_session() -> bool:
+    access_token = session.get("access_token")
+    if not access_token:
+        return False
+
+    now = datetime.now(timezone.utc).timestamp()
+    try:
+        claims = jwt.get_unverified_claims(access_token)
+        exp = claims.get("exp", 0)
+    except Exception:
+        session.clear()
+        flash("セッション情報が無効です。再度ログインしてください。", "error")
+        return False
+
+    supabase: Client | None = current_app.config.get("SUPABASE")
+    if not supabase:
+        return True
+
+    # 有効期限切れ（または残り60秒以内）の場合はリフレッシュを試みる
+    if exp <= now + 60:
+        refresh_token = session.get("refresh_token")
+        if not refresh_token:
+            session.clear()
+            flash("セッションの有効期限が切れました。再度ログインしてください。", "info")
+            return False
+        try:
+            res = supabase.auth.refresh_session(refresh_token)
+            new_session = getattr(res, "session", None)
+            if not new_session:
+                session.clear()
+                flash("セッションの更新に失敗しました。再度ログインしてください。", "info")
+                return False
+            session["access_token"] = new_session.access_token
+            session["refresh_token"] = new_session.refresh_token
+            session["last_validated_at"] = now
+            return True
+        except Exception:
+            session.clear()
+            flash("セッションの有効期限が切れました。再度ログインしてください。", "info")
+            return False
+
+    # 5分ごとにSupabaseサーバー側でユーザーの有効性を確認
+    last_val = session.get("last_validated_at", 0)
+    if now - last_val > 300:
+        try:
+            user_resp = supabase.auth.get_user(jwt=access_token)
+            if not user_resp or not getattr(user_resp, "user", None):
+                session.clear()
+                flash("アカウントの認証状態が無効化されました。再度ログインしてください。", "error")
+                return False
+            session["last_validated_at"] = now
+        except Exception:
+            # ネットワーク接続障害等の一時エラー時は、ローカルJWTのexpが有効であれば通過
+            pass
+
+    return True
+
+
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         # Supabase Auth を使用している場合
         if USE_SUPABASE_AUTH:
             if not session.get("access_token"):
+                return redirect(url_for("login"))
+            if not ensure_valid_supabase_session():
                 return redirect(url_for("login"))
         else:
             # 従来のセッション認証
@@ -663,12 +780,15 @@ class PgConnection:
 
 
 def get_db() -> Any:
-    if DATABASE_URL:
-        raw = psycopg2.connect(DATABASE_URL)
-        return PgConnection(raw)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if "db" not in g:
+        if DATABASE_URL:
+            raw = psycopg2.connect(DATABASE_URL)
+            g.db = PgConnection(raw)
+        else:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            g.db = conn
+    return g.db
 
 
 def init_db(app: Flask) -> None:

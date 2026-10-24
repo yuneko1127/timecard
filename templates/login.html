@@ -4,6 +4,7 @@
 <section class="card">
   <h2>ログイン</h2>
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     {% if use_supabase_auth %}
     <label>メールアドレス
       <input name="email" type="email" required />

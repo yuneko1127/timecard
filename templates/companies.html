@@ -4,6 +4,7 @@
 <section class="card">
   <h2>会社設定</h2>
   <form method="post" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     <input type="hidden" name="action" value="add" />
     <label>新規会社名
       <input name="name" required />
@@ -15,6 +16,7 @@
 <section class="card">
   <h3>登録済み会社</h3>
   <form method="post" class="companies-bulk-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     <input type="hidden" name="action" value="update_all" />
     <div class="table-scroll">
     <table>

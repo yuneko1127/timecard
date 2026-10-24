@@ -23,7 +23,10 @@
       <a href="{{ url_for('punch') }}">打刻</a>
       <a href="{{ url_for('attendance') }}">勤怠確認</a>
       <a href="{{ url_for('companies') }}">会社設定</a>
-      <a href="{{ url_for('logout') }}" class="nav-logout">ログアウト</a>
+      <form method="post" action="{{ url_for('logout') }}" class="nav-logout-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <button type="submit" class="nav-logout">ログアウト</button>
+      </form>
     </nav>
     {% endif %}
   </header>

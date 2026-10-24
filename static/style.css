@@ -151,15 +151,36 @@ h3 {
   outline-offset: 2px;
 }
 
-.header-nav a.nav-logout {
+.header-nav .nav-logout-form {
   margin-left: auto;
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.22);
+  display: flex;
+  margin-block: 0;
 }
 
-.header-nav a.nav-logout:hover {
+.header-nav a.nav-logout,
+.header-nav button.nav-logout {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.92rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.header-nav a.nav-logout:hover,
+.header-nav button.nav-logout:hover {
   background: rgba(255, 100, 100, 0.35);
   border-color: rgba(255, 200, 200, 0.45);
+}
+
+.header-nav button.nav-logout:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 main {

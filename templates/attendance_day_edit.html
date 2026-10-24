@@ -33,7 +33,7 @@
     <tbody>
       {% for e in events %}
       <tr>
-        <td>{{ e.id }}<form id="upd-{{ e.id }}" method="post"></form></td>
+        <td>{{ e.id }}<form id="upd-{{ e.id }}" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}" /></form></td>
         <td>
           <select name="company_id" form="upd-{{ e.id }}" required>
             {% if e.company_id not in companies|map(attribute='id') %}
@@ -60,6 +60,7 @@
         </td>
         <td>
           <form method="post" class="inline-delete" onsubmit="return confirm('この打刻を削除しますか？');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
             <input type="hidden" name="action" value="delete" />
             <input type="hidden" name="event_id" value="{{ e.id }}" />
             <button type="submit" class="danger">削除</button>
@@ -88,6 +89,7 @@
       <tr>
         <td colspan="4">
           <form method="post" class="add-form-row">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
             <input type="hidden" name="action" value="add" />
             <label class="add-cell">会社
               <select name="company_id" required>
