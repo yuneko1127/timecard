@@ -83,3 +83,7 @@ SUPABASE_URL="https://your-project.supabase.co" SUPABASE_KEY="publishable key" p
 
 既存の `timecard.db` がある場合は、別途ダンプ・リストア（`pgloader` や CSV 経由など）で移行してください。スキーマは `app.py` の `_init_db_postgres` / `_init_db_sqlite` を参照してください。
 
+## ライセンス
+
+[MIT License](LICENSE)
+
