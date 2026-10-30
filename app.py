@@ -40,7 +40,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, Paragraph
 from supabase import create_client, Client
-from jose import JWTError, jwt
+import jwt
 
 # .env ファイルから環境変数を読み込む
 load_dotenv()
@@ -672,7 +672,10 @@ def ensure_valid_supabase_session() -> bool:
 
     now = datetime.now(timezone.utc).timestamp()
     try:
-        claims = jwt.get_unverified_claims(access_token)
+        claims = jwt.decode(
+            access_token,
+            options={"verify_signature": False, "verify_exp": False},
+        )
         exp = claims.get("exp", 0)
     except Exception:
         session.clear()

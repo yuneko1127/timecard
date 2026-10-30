@@ -4,4 +4,4 @@ psycopg2-binary
 gunicorn
 python-dotenv
 supabase
-python-jose[cryptography]
+PyJWT
